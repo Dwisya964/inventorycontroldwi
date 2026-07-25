@@ -87,12 +87,70 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
   <script type="text/babel">
-    const { useState, useEffect, useRef, useMemo } = React;
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbzDETBAs3X_tR-U2MYd6IowQ6Q9AS9_4CGstcnLqidIFzTWIkmx3-_SMcPe1c7Jye0P/exec";
+  async function sendToGAS(action, payload = {}) {
+  try {
+    const response = await fetch(GAS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8", // Sangat penting agar tidak terkena CORS
+      },
+      body: JSON.stringify({ action: action, ...payload }),
+    });
+    
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error("Error connecting to GAS:", error);
+    throw error;
+  }
+}
+   const { useState, useEffect, useRef, useMemo } = React;
 
+    // =========================================================
+    // 1. KONFIGURASI BACKEND GOOGLE APPS SCRIPT
+    // =========================================================
+    // Ganti URL di bawah dengan Web App URL dari Deployment GAS Anda
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzDETBAs3X_tR-U2MYd6IowQ6Q9AS9_4CGstcnLqidIFzTWIkmx3-_SMcPe1c7Jye0P/exec";
+
+    // Helper fungsi universal untuk komunikasi Fetch API ke GAS (Aman dari CORS)
+   async function sendToGAS(action, payload = {}) {
+      if (!isGasActive) {
+        console.warn("GAS_URL belum dikonfigurasi.");
+        return { error: "GAS_URL belum dikonfigurasi" };
+      }
+
+      try {
+        const response = await fetch(GAS_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8",
+          },
+          // Menggabungkan action dan payload menjadi satu objek JSON
+          body: JSON.stringify({ action: action, ...payload }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP Status Error: ${response.status}`);
+        }
+
+        return await response.json();
+      } catch (error) {
+        console.error("Gagal terhubung ke Google Apps Script:", error);
+        return { success: false, error: error.message || "Gagal terhubung ke server." };
+      }
+    }
+
+    // =========================================================
+    // 2. MASTER DATA (KATEGORI & LOKASI)
+    // =========================================================
     const CATEGORIES = ["IT", "Furniture", "Mesin", "Kendaraan", "Elektronik", "Peralatan", "Lainnya", "Aset Lain"];
     const LOCATIONS = ["Finance", "HRD", "Ruang Server", "Marketing", "Gudang Utama", "Operasional", "Meeting Room", "Gudang"];
 
-    // Global helper — converts any Google Drive share URL to thumbnail URL embeddable in <img>
+    // =========================================================
+    // 3. HELPER FUNCTIONS & INITIAL STATES
+    // =========================================================
+    // Mengubah URL Google Drive biasa menjadi link thumbnail gambar yang bisa di-embed
     const convertDriveUrl = (url) => {
       if (!url) return "";
       const s = url.trim();
@@ -104,30 +162,16 @@
       return s;
     };
 
-    const INITIAL_ASSETS = [
-      { id: "1", kodeAset: "AST0001", namaAset: "Laptop Dell Latitude", barcode: "8806091234001", kategori: "IT", lokasi: "Finance", tanggalBeli: "2025-01-15", masaManfaat: "4 Tahun", status: "Aktif", keterangan: "Laptop inventaris staf finance devisi akuntansi.", fotoUrl: "" },
-      { id: "2", kodeAset: "AST0002", namaAset: "Printer Epson L3250", barcode: "8806091234002", kategori: "IT", lokasi: "HRD", tanggalBeli: "2025-02-10", masaManfaat: "4 Tahun", status: "Aktif", keterangan: "Printer wireless inkjet untuk cetak slip gaji.", fotoUrl: "" },
-      { id: "3", kodeAset: "AST0003", namaAset: "AC Daikin 1 PK", barcode: "8806091234003", kategori: "Elektronik", lokasi: "Ruang Server", tanggalBeli: "2025-03-05", masaManfaat: "5 Tahun", status: "Aktif", keterangan: "AC ruang server utama.", fotoUrl: "" },
-      { id: "4", kodeAset: "AST0004", namaAset: "Meja Kerja", barcode: "8806091234004", kategori: "Furniture", lokasi: "Marketing", tanggalBeli: "2025-03-20", masaManfaat: "6 Tahun", status: "Aktif", keterangan: "Meja kerja kayu jati minimalis.", fotoUrl: "" },
-      { id: "5", kodeAset: "AST0005", namaAset: "Kursi Kantor", barcode: "8806091234005", kategori: "Furniture", lokasi: "Finance", tanggalBeli: "2025-03-20", masaManfaat: "6 Tahun", status: "Aktif", keterangan: "Kursi ergonomis hidrolik.", fotoUrl: "" },
-      { id: "6", kodeAset: "AST0006", namaAset: "Monitor LG 24\"", barcode: "8806091234006", kategori: "IT", lokasi: "Finance", tanggalBeli: "2025-04-15", masaManfaat: "4 Tahun", status: "Aktif", keterangan: "Monitor display keuangan.", fotoUrl: "" },
-      { id: "7", kodeAset: "AST0007", namaAset: "Kamera CCTV Hikvision", barcode: "8806091234007", kategori: "Elektronik", lokasi: "Gudang", tanggalBeli: "2025-05-01", masaManfaat: "5 Tahun", status: "Aktif", keterangan: "CCTV pemantauan logistik.", fotoUrl: "" },
-      { id: "8", kodeAset: "AST0008", namaAset: "Rak Besi 4 Tingkat", barcode: "8806091234008", kategori: "Furniture", lokasi: "Gudang", tanggalBeli: "2025-05-10", masaManfaat: "8 Tahun", status: "Aktif", keterangan: "Rak penyimpanan dokumen arsip.", fotoUrl: "" },
-      { id: "9", kodeAset: "AST0009", namaAset: "Mesin Fotocopy Canon", barcode: "8806091234009", kategori: "Elektronik", lokasi: "HRD", tanggalBeli: "2025-05-18", masaManfaat: "5 Tahun", status: "Rusak", keterangan: "Sedang dalam maintenance.", fotoUrl: "" },
-      { id: "10", kodeAset: "AST0010", namaAset: "Mobil Toyota Avanza", barcode: "8806091234010", kategori: "Kendaraan", lokasi: "Operasional", tanggalBeli: "2025-06-01", masaManfaat: "8 Tahun", status: "Aktif", keterangan: "Mobil operasional kantor.", fotoUrl: "" }
-    ];
+    // Initial state di-set KOSONG agar data dimuat secara dinamis dari Google Sheets
+    const INITIAL_ASSETS = [];
+    const INITIAL_ACTIVE_SO = [];
+    const INITIAL_COMPLETED_SO = [];
 
-    const INITIAL_ACTIVE_SO = [
-      { id: "so-1", kodeBarang: "8806091234001", namaBarang: "Laptop Dell Latitude", lokasi: "Gudang Utama", qty: 10, waktuInput: "2026-06-27 09:41:22" },
-      { id: "so-2", kodeBarang: "8806091234002", namaBarang: "Printer Epson L3250", lokasi: "Gudang Utama", qty: 5, waktuInput: "2026-06-27 09:41:10" }
-    ];
-
-    const INITIAL_COMPLETED_SO = [
-      { id: "cso-1", periode: "Juni 2026", tanggalSelesai: "27/06/2026 09:41", lokasi: "Gudang Utama", namaFileExcel: "SO_20260627_0941.xlsx", jumlahItem: 2, totalQty: 15, items: [] }
-    ];
-
+    // =========================================================
+    // 4. UI COMPONENTS (OPTIMIZED)
+    // =========================================================
+    // Komponen Icon ringan tanpa useEffect berulang (mencegah performa lambat/lag)
     const Icon = ({ name, className = "h-5 w-5", ...props }) => {
-      useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
       return (
         <span
           className={`inline-flex items-center justify-center ${className}`}
@@ -137,6 +181,27 @@
       );
     };
 
+    // Dialog Konfirmasi Hapus/Aksi
+    function ConfirmDialog({ isOpen, title, message, onConfirm, onCancel }) {
+      if (!isOpen) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-[#12324b] border border-[#1e5574] w-full max-w-sm rounded-2xl p-6 space-y-6">
+            <div className="text-center space-y-2">
+              <div className="h-12 w-12 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto">
+                <Icon name="help-circle" className="h-6 w-6" />
+              </div>
+              <h4 className="font-extrabold text-sm text-white">{title}</h4>
+              <p className="text-[11px] text-slate-400 leading-relaxed">{message}</p>
+            </div>
+            <div className="flex gap-2 text-xs">
+              <button onClick={onCancel} className="flex-1 py-2.5 border border-slate-700 text-slate-300 rounded-xl font-bold hover:bg-slate-950/40">Batal</button>
+              <button onClick={onConfirm} className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow">Ya, Lanjutkan</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
     function ConfirmDialog({ isOpen, title, message, onConfirm, onCancel }) {
       if (!isOpen) return null;
       return (
@@ -277,7 +342,7 @@
         }
       };
 
-      // Auto-check & start when tab becomes active
+      // Auto-check & start saat tab aktif / dinonaktifkan
       useEffect(() => {
         if (isActive && !scannerRef.current && !isStarting) {
           checkPermission();
@@ -287,13 +352,22 @@
         }
       }, [isActive]);
 
-      // Cleanup on unmount
+      // Cleanup menyeluruh saat komponen di-unmount (pindah halaman)
       useEffect(() => {
         return () => {
-          if (scannerRef.current) { scannerRef.current.stop().catch(() => {}); scannerRef.current = null; }
+          // 1. Stop instance scanner library
+          if (scannerRef.current) {
+            scannerRef.current.stop().catch(() => {});
+            scannerRef.current = null;
+          }
+          // 2. Paksa matikan semua stream kamera browser yang masih tersisa
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+              .then(stream => stream.getTracks().forEach(track => track.stop()))
+              .catch(() => {});
+          }
         };
       }, []);
-
       const simulateScan = () => {
         triggerToast("Menjalankan simulasi scan...");
         setTimeout(() => {
@@ -1424,18 +1498,31 @@
       // Convert any Google Drive share URL to a thumbnail embeddable image URL
       const fotoPreviewUrl = convertDriveUrl(formFotoUrl);
 
+      // Auto-generate Kode Aset & Barcode otomatis hanya saat mode 'add' diaktifkan
       useEffect(() => {
         if (formMode === "add") {
+          // 1. Cari nomor terbesar dari kode aset yang sudah ada (misal: AST0010 -> 10)
           let maxNum = 0;
-          assets.forEach(a => {
-            const num = parseInt(a.kodeAset.replace("AST", ""));
-            if (!isNaN(num) && num > maxNum) maxNum = num;
-          });
-          setFormKodeAset(`AST${(maxNum + 1).toString().padStart(4, "0")}`);
-          setFormBarcode("880609" + Math.floor(1000000 + Math.random() * 9000000).toString());
-        }
-      }, [formMode, assets]);
+          if (Array.isArray(assets) && assets.length > 0) {
+            assets.forEach(a => {
+              if (a.kodeAset) {
+                const num = parseInt(a.kodeAset.replace(/[^0-9]/g, ""), 10);
+                if (!isNaN(num) && num > maxNum) maxNum = num;
+              }
+            });
+          }
 
+          // 2. Format kode aset baru (contoh: AST0011)
+          const nextKode = `AST${(maxNum + 1).toString().padStart(4, "0")}`;
+          setFormKodeAset(nextKode);
+
+          // 3. Generate barcode EAN-13 acak jika form barcode masih kosong
+          if (!formBarcode) {
+            const randomDigits = Math.floor(1000000 + Math.random() * 9000000).toString();
+            setFormBarcode(`880609${randomDigits}`);
+          }
+        }
+      }, [formMode]); // Hanya terpicu saat formMode berubah ke "add"
       const handleResetForm = () => {
         setFormMode("add"); setEditingId(null); setFormNamaAset("");
         setFormKategori(CATEGORIES[0]); setFormLokasi(LOCATIONS[0]);
@@ -2030,78 +2117,151 @@
         setTimeout(() => setToast(null), 3000);
       };
 
-      // google.script.run hanya tersedia saat file ini dibuka dari Web App
-      // Google Apps Script. Saat dibuka langsung dari komputer, aplikasi tetap
-      // bisa tampil menggunakan data contoh (mode offline).
-      const isGasAvailable =
-        typeof google !== "undefined" &&
-        google.script &&
-        typeof google.script.run !== "undefined";
+      // Cek apakah GAS_URL telah diisi dengan URL Web App Google Apps Script yang valid
+      const isGasActive = 
+        typeof GAS_URL !== "undefined" && 
+        GAS_URL !== "" && 
+        GAS_URL.startsWith("https://script.google.com/");
 
+      // Memuat data dari Google Sheets saat aplikasi pertama kali dibuka
       useEffect(() => {
-        if (isGasAvailable) {
-          setIsGasActive(true);
-          fetchSpreadsheetData();
-        } else {
-          triggerToast("Berjalan offline (Mode Sandbox lokal).");
-        }
-      }, []);
-
-      const fetchSpreadsheetData = () => {
-        if (!isGasAvailable) return;
-        google.script.run
-          .withSuccessHandler((res) => {
-            if (res.success) {
-              setAssets(res.assets || []);
-              setActiveSO(res.activeSO || []);
-              setCompletedSO(res.completedSO || []);
-              setSheetUrl(res.sheetUrl || "");
-            } else {
-              triggerToast(`Gagal memuat spreadsheet: ${res.error}`);
+        const loadInitialData = async () => {
+          // Pastikan GAS_URL sudah diisi dan bukan URL dummy/default
+          if (typeof GAS_URL !== "undefined" && GAS_URL && !GAS_URL.includes("AKfycbx...")) {
+            try {
+              setIsGasActive(true);
+              triggerToast("Menghubungkan ke Google Sheets...");
+              
+              // Panggil fungsi mengambil data aset dari GAS
+              const res = await sendToGAS("getAssets");
+              
+              if (res && res.status === "success" && Array.isArray(res.data)) {
+                setAssets(res.data);
+                triggerToast("✓ Data aset berhasil dimuat dari Spreadsheet!");
+              } else {
+                triggerToast("⚠️ Format data dari Spreadsheet tidak sesuai.");
+              }
+            } catch (error) {
+              console.error("Gagal memuat data dari GAS:", error);
+              setIsGasActive(false);
+              triggerToast("⚠️ Koneksi GAS gagal. Berjalan dalam Mode Offline.");
             }
-          })
-          .withFailureHandler((err) => {
-            const message = err && err.message ? err.message : String(err || "Kesalahan tidak diketahui");
-            triggerToast(`Gagal terhubung ke Google Apps Script: ${message}`);
-          })
-          .getSpreadsheetData();
-      };
+          } else {
+            setIsGasActive(false);
+            triggerToast("Mode Offline (URL GAS belum dikonfigurasi).");
+          }
+        };
 
-      const handleAddAsset = (newAsset) => {
+        loadInitialData();
+      }, []); // Berjalan sekali saat pertama kali aplikasi dibuka
+     const fetchSpreadsheetData = async () => {
+        if (!isGasActive) return;
+
+        try {
+          // Panggil fungsi sendToGAS untuk mengambil seluruh data
+          const res = await sendToGAS("getAssets");
+
+          if (res && (res.status === "success" || res.success || !res.error)) {
+            // Ambil data dari respon
+            const data = res.data || res;
+            
+            setAssets(data.assets || data.data || []);
+            setActiveSO(data.activeSO || []);
+            setCompletedSO(data.completedSO || []);
+            setSheetUrl(data.sheetUrl || "");
+          } else {
+            triggerToast(`Gagal memuat spreadsheet: ${res.error || 'Respon tidak valid'}`);
+          }
+        } catch (err) {
+          const message = err && err.message ? err.message : String(err || "Kesalahan tidak diketahui");
+          console.error("Error fetching data:", err);
+          triggerToast(`Gagal terhubung ke Google Apps Script: ${message}`);
+        }
+      };
+     const handleAddAsset = async (newAsset) => {
+        // 1. Update UI secara lokal terlebih dahulu (Optimistic Update)
         const updated = [newAsset, ...assets];
         setAssets(updated);
-        triggerToast("Aset baru terdaftar secara lokal.");
-        if (isGasAvailable) {
-          google.script.run
-            .withSuccessHandler((res) => { if (res.success) { triggerToast("Aset tersinkronisasi ke Spreadsheet."); fetchSpreadsheetData(); } })
-            .addOrUpdateAssetGas(newAsset);
+        
+        // 2. Jika koneksi GAS aktif, kirim data ke Google Sheets
+        if (isGasActive) {
+          triggerToast("Menyimpan ke Spreadsheet...");
+          try {
+            // Panggil fungsi sendToGAS dengan action 'addOrUpdateAsset'
+            const res = await sendToGAS("addOrUpdateAsset", { assetData: newAsset });
+            
+            if (res && (res.status === "success" || res.success)) {
+              triggerToast("✓ Aset tersinkronisasi ke Spreadsheet.");
+              // Jika Anda ingin reload data terbaru dari Spreadsheet
+              fetchSpreadsheetData(); 
+            } else {
+              triggerToast("⚠️ Aset tersimpan lokal, gagal sinkron ke Spreadsheet.");
+            }
+          } catch (error) {
+            console.error("Gagal sinkronisasi aset ke GAS:", error);
+            triggerToast("⚠️ Terjadi kesalahan saat menghubungkan ke Spreadsheet.");
+          }
+        } else {
+          triggerToast("Aset baru terdaftar secara lokal (Offline).");
         }
       };
 
-      const handleUpdateAsset = (updatedAsset) => {
+    const handleUpdateAsset = async (updatedAsset) => {
+        // 1. Update UI secara lokal terlebih dahulu (Optimistic UI Update)
         const updated = assets.map(a => a.id === updatedAsset.id ? updatedAsset : a);
         setAssets(updated);
-        triggerToast("Data aset diperbarui.");
-        if (isGasAvailable) {
-          google.script.run
-            .withSuccessHandler((res) => { if (res.success) { triggerToast("Pembaruan tersinkron ke Spreadsheet."); fetchSpreadsheetData(); } })
-            .addOrUpdateAssetGas(updatedAsset);
+        
+        // 2. Jika koneksi GAS aktif, kirim data pembaruan ke Google Sheets
+        if (isGasActive) {
+          triggerToast("Memperbarui data di Spreadsheet...");
+          try {
+            // Panggil fungsi sendToGAS dengan action 'addOrUpdateAsset'
+            const res = await sendToGAS("addOrUpdateAsset", { assetData: updatedAsset });
+            
+            if (res && (res.status === "success" || res.success)) {
+              triggerToast("✓ Pembaruan tersinkron ke Spreadsheet.");
+              fetchSpreadsheetData();
+            } else {
+              triggerToast("⚠️ Terubah di lokal, gagal sinkron ke Spreadsheet.");
+            }
+          } catch (error) {
+            console.error("Gagal sinkronisasi update ke GAS:", error);
+            triggerToast("⚠️ Terjadi kesalahan saat memperbarui ke Spreadsheet.");
+          }
+        } else {
+          triggerToast("Data aset diperbarui secara lokal (Offline).");
         }
       };
 
-      const handleConfirmDeleteAsset = (id) => {
+     const handleConfirmDeleteAsset = (id) => {
         setConfirmDialog({
           isOpen: true,
           title: "Hapus Master Aset",
           message: "Apakah Anda yakin ingin menghapus aset ini dari database utama? Tindakan ini tidak dapat dibatalkan.",
-          onConfirm: () => {
-            setAssets(assets.filter(a => a.id !== id));
+          onConfirm: async () => {
+            // 1. Hapus dari UI lokal (Optimistic UI Update)
+            setAssets(prevAssets => prevAssets.filter(a => a.id !== id));
             setConfirmDialog(p => ({ ...p, isOpen: false }));
-            triggerToast("Aset dihapus.");
-            if (isGasAvailable) {
-              google.script.run
-                .withSuccessHandler((res) => { if (res.success) { triggerToast("Penghapusan tersinkron."); fetchSpreadsheetData(); } })
-                .deleteAssetGas(id);
+            
+            // 2. Jika koneksi GAS aktif, kirim perintah hapus ke Google Sheets
+            if (isGasActive) {
+              triggerToast("Menghapus dari Spreadsheet...");
+              try {
+                // Sesuai dengan switch-case: action 'deleteAsset' dan payload { id }
+                const res = await sendToGAS("deleteAsset", { id: id });
+                
+                if (res && (res.status === "success" || res.success || !res.error)) {
+                  triggerToast("✓ Penghapusan tersinkron ke Spreadsheet.");
+                  fetchSpreadsheetData();
+                } else {
+                  triggerToast(`⚠️ Gagal hapus di Spreadsheet: ${res.error || 'Unknown error'}`);
+                }
+              } catch (error) {
+                console.error("Gagal sinkronisasi hapus ke GAS:", error);
+                triggerToast("⚠️ Terjadi kesalahan saat menghapus di Spreadsheet.");
+              }
+            } else {
+              triggerToast("Aset dihapus secara lokal (Offline).");
             }
           }
         });
@@ -2130,20 +2290,43 @@
           triggerToast(`${itemPayload.namaAset} ditambahkan ke draf.`);
         }
         setActiveSO(updatedSO);
-        if (isGasAvailable) {
-          google.script.run
-            .withSuccessHandler(() => {})
-            .saveStockOpnameDraftGas(updatedSO);
+
+      if (isGasActive) {
+          try {
+            // Mengirim data SO ke Google Apps Script
+            const res = await sendToGAS("addSOItem", { data: updatedSO });
+            
+            if (res && res.error) {
+              console.error("Gagal menyimpan SO ke GAS:", res.error);
+              triggerToast("⚠️ Gagal menyimpan ke Spreadsheet.");
+            } else {
+              triggerToast("✓ Data SO tersimpan.");
+            }
+          } catch (error) {
+            console.error("Gagal sinkronisasi Stock Opname:", error);
+            triggerToast("⚠️ Terjadi kesalahan koneksi.");
+          }
         }
       };
 
       const handleUpdateSOItem = (id, newQty, newLokasi) => {
         const updated = activeSO.map(item => item.id === id ? { ...item, qty: newQty, lokasi: newLokasi, waktuInput: new Date().toLocaleString("id-ID") } : item);
         setActiveSO(updated);
-        if (isGasAvailable) {
-          google.script.run
-            .withSuccessHandler(() => {})
-            .saveStockOpnameDraftGas(updated);
+        if (isGasActive) {
+          try {
+            const res = await sendToGAS("addSOItem", { data: updated });
+            
+            if (res && res.error) {
+              console.error("Gagal update SO ke Spreadsheet:", res.error);
+              triggerToast("⚠️ Gagal memperbarui Stock Opname.");
+            } else {
+              // Jika berhasil (opsional)
+              triggerToast("✓ Stock Opname diperbarui.");
+            }
+          } catch (error) {
+            console.error("Gagal sinkronisasi SO:", error);
+            triggerToast("⚠️ Terjadi kesalahan koneksi.");
+          }
         }
       };
 
@@ -2151,18 +2334,36 @@
         const updated = activeSO.filter(item => item.id !== id);
         setActiveSO(updated);
         triggerToast("Item dihapus dari draf.");
-        if (isGasAvailable) {
-          google.script.run
-            .withSuccessHandler(() => {})
-            .saveStockOpnameDraftGas(updated);
+       if (isGasActive) {
+          try {
+            // Mengirim data SO yang diperbarui ke GAS via action addSOItem atau updateSOItem
+            sendToGAS("addSOItem", { data: updated })
+              .then((res) => {
+                if (res && res.error) {
+                  console.error("Gagal update SO ke Spreadsheet:", res.error);
+                }
+              })
+              .catch((err) => console.error("Error koneksi update SO:", err));
+          } catch (error) {
+            console.error("Gagal sinkronisasi SO:", error);
+          }
         }
       };
 
       const handleSaveSODraft = () => {
-        if (isGasAvailable) {
-          google.script.run
-            .withSuccessHandler(() => triggerToast("Draf berhasil dicadangkan ke Spreadsheet."))
-            .saveStockOpnameDraftGas(activeSO);
+        if (isGasActive) {
+          triggerToast("Mencadangkan draf ke Spreadsheet...");
+          try {
+            const res = await sendToGAS("addSOItem", { data: activeSO });
+            if (res && !res.error) {
+              triggerToast("✓ Draf berhasil dicadangkan ke Spreadsheet.");
+            } else {
+              triggerToast("⚠️ Gagal mencadangkan draf ke Spreadsheet.");
+            }
+          } catch (error) {
+            console.error("Gagal cadangkan draf SO:", error);
+            triggerToast("⚠️ Terjadi kesalahan koneksi ke Spreadsheet.");
+          }
         } else {
           triggerToast("Draf berhasil dicadangkan lokal.");
         }
@@ -2238,10 +2439,24 @@
             setConfirmDialog(p => ({ ...p, isOpen: false }));
             triggerToast("Laporan stock opname dirilis.");
 
-            if (isGasAvailable) {
-              google.script.run
-                .withSuccessHandler((res) => { if (res.success) { triggerToast("Laporan tersimpan di Spreadsheet."); fetchSpreadsheetData(); } })
-                .saveStockOpnameGas(newRecord);
+           if (isGasActive) {
+              triggerToast("Menyimpan laporan ke Spreadsheet...");
+              try {
+                // Sesuai dengan switch-case di code.gs Anda: 'releaseSOReport'
+                const res = await sendToGAS("releaseSOReport", { data: newRecord });
+
+                if (res && (res.status === "success" || res.success || !res.error)) {
+                  triggerToast("✓ Laporan tersimpan di Spreadsheet.");
+                  fetchSpreadsheetData();
+                } else {
+                  triggerToast(`⚠️ Gagal simpan laporan: ${res.error || 'Unknown error'}`);
+                }
+              } catch (error) {
+                console.error("Gagal simpan laporan SO ke GAS:", error);
+                triggerToast("⚠️ Terjadi kesalahan koneksi saat menyimpan laporan.");
+              }
+            } else {
+              triggerToast("Laporan tersimpan secara lokal (Offline).");
             }
           }
         });
@@ -2251,10 +2466,21 @@
         const updated = completedSO.map(so => so.id === id ? { ...so, periode: newPeriode, lokasi: newLokasi } : so);
         setCompletedSO(updated);
         triggerToast("Arsip diperbarui.");
-        if (isGasAvailable) {
-          google.script.run
-            .withSuccessHandler((res) => { if (res.success) { fetchSpreadsheetData(); } })
-            .updateCompletedSOGas(id, newPeriode, newLokasi);
+       if (isGasActive) {
+          try {
+            // Sesuai switch-case di code.gs Anda: action 'updateSOItem'
+            const res = await sendToGAS("updateSOItem", { 
+              data: { id, newPeriode, newLokasi } 
+            });
+
+            if (res && (res.status === "success" || res.success || !res.error)) {
+              fetchSpreadsheetData();
+            } else {
+              console.error("Gagal update SO di Spreadsheet:", res.error);
+            }
+          } catch (error) {
+            console.error("Gagal sinkronisasi update SO ke GAS:", error);
+          }
         }
       };
 
@@ -2267,10 +2493,24 @@
             setCompletedSO(completedSO.filter(so => so.id !== id));
             setConfirmDialog(p => ({ ...p, isOpen: false }));
             triggerToast("Arsip laporan dihapus.");
-            if (isGasAvailable) {
-              google.script.run
-                .withSuccessHandler((res) => { if (res.success) { triggerToast("Arsip berhasil dihapus permanen."); fetchSpreadsheetData(); } })
-                .deleteCompletedSOGas(id);
+            if (isGasActive) {
+              triggerToast("Menghapus arsip dari Spreadsheet...");
+              try {
+                // Sesuai dengan switch-case di code.gs Anda: action 'deleteSOItem'
+                const res = await sendToGAS("deleteSOItem", { id: id });
+
+                if (res && (res.status === "success" || res.success || !res.error)) {
+                  triggerToast("✓ Arsip berhasil dihapus permanen.");
+                  fetchSpreadsheetData();
+                } else {
+                  triggerToast(`⚠️ Gagal hapus di Spreadsheet: ${res.error || 'Unknown error'}`);
+                }
+              } catch (error) {
+                console.error("Gagal sinkronisasi hapus arsip SO ke GAS:", error);
+                triggerToast("⚠️ Terjadi kesalahan koneksi saat menghapus arsip.");
+              }
+            } else {
+              triggerToast("Arsip dihapus secara lokal (Offline).");
             }
           }
         });
