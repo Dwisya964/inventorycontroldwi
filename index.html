@@ -589,34 +589,56 @@
     }
 
     function Navbar({ activeTab, adminSubTab, isGasActive, onToggleMobileMenu }) {
-      const getTitle = () => {
-        if (activeTab === "dashboard") return "Dashboard Utama";
-        if (activeTab === "stock-opname") return "Sesi Input Stock Opname";
-        if (activeTab === "scan-cek") return "Pindai & Cek Informasi Aset";
-        if (activeTab === "admin-data") {
-          if (adminSubTab === "daftar-aset") return "Manajemen Aset Tetap";
-          if (adminSubTab === "hasil-so") return "Hasil Stock Opname";
-          if (adminSubTab === "pergerakan-so") return "Pergerakan SO — Perbandingan";
-          if (adminSubTab === "daftar-hasil-so") return "Daftar Hasil SO (Selesai)";
-        }
+  // Fungsi penentuan judul halaman secara dinamis
+  const getTitle = () => {
+    switch (activeTab) {
+      case "dashboard":
+        return "Dashboard Utama";
+      case "stock-opname":
+        return "Sesi Input Stock Opname";
+      case "scan-cek":
+        return "Pindai & Cek Informasi Aset";
+      case "admin-data":
+        if (adminSubTab === "daftar-aset") return "Manajemen Aset Tetap";
+        if (adminSubTab === "hasil-so") return "Hasil Stock Opname";
+        if (adminSubTab === "pergerakan-so") return "Pergerakan SO — Perbandingan";
+        if (adminSubTab === "daftar-hasil-so") return "Daftar Hasil SO (Selesai)";
+        return "Manajemen Aset";
+      default:
         return "Asset Pro Platform";
-      };
-      return (
-        <header className="h-16 border-b border-[#1e5574] bg-[#12324b]/15 px-4 md:px-6 flex items-center justify-between shrink-0 select-none">
-          <div className="flex items-center gap-3">
-            <button onClick={onToggleMobileMenu} className="md:hidden p-2 hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg transition-colors" title="Buka Menu">
-              <Icon name="menu" className="h-5 w-5" />
-            </button>
-            <h2 className="text-xs sm:text-sm font-extrabold text-white uppercase tracking-tight truncate max-w-[150px] sm:max-w-none">{getTitle()}</h2>
-          </div>
-          <div className="flex items-center gap-2 text-[10px] md:text-xs font-semibold text-slate-400 bg-slate-900/60 border border-[#1e5574]/40 px-2.5 md:px-3 py-1.5 rounded-xl shrink-0">
-            <span className={`h-1.5 w-1.5 rounded-full ${isGasActive ? 'bg-emerald-400 animate-pulse' : 'bg-blue-400 animate-pulse'}`}></span>
-            <span className="hidden sm:inline">{isGasActive ? "Welcome to the application" : "Local Sandbox Environment"}</span>
-            <span className="sm:hidden">{isGasActive ? "Live-Sync" : "Sandbox"}</span>
-          </div>
-        </header>
-      );
     }
+  };
+
+  return (
+    <header className="h-16 border-b border-[#1e5574] bg-[#12324b]/15 px-4 md:px-6 flex items-center justify-between shrink-0 select-none">
+      {/* Sisi Kiri: Tombol Hamburger (Khusus Mobile) & Judul Halaman */}
+      <div className="flex items-center gap-3">
+        <button 
+          onClick={onToggleMobileMenu} 
+          className="md:hidden p-2 hover:bg-slate-800/60 text-slate-300 hover:text-white rounded-lg transition-colors focus:outline-none" 
+          title="Buka Menu Navigasi"
+          aria-label="Buka Menu Navigasi"
+        >
+          <Icon name="menu" className="h-5 w-5" />
+        </button>
+        <h2 className="text-xs sm:text-sm font-extrabold text-white uppercase tracking-tight truncate max-w-[160px] sm:max-w-none">
+          {getTitle()}
+        </h2>
+      </div>
+
+      {/* Sisi Kanan: Status Koneksi Database/GAS */}
+      <div className="flex items-center gap-2 text-[10px] md:text-xs font-semibold text-slate-400 bg-slate-900/60 border border-[#1e5574]/40 px-2.5 md:px-3 py-1.5 rounded-xl shrink-0">
+        <span className={`h-1.5 w-1.5 rounded-full ${isGasActive ? 'bg-emerald-400 animate-pulse' : 'bg-blue-400 animate-pulse'}`}></span>
+        <span className="hidden sm:inline">
+          {isGasActive ? "Welcome to the application" : "Local Sandbox Environment"}
+        </span>
+        <span className="sm:hidden">
+          {isGasActive ? "Live-Sync" : "Sandbox"}
+        </span>
+      </div>
+    </header>
+  );
+}
 
     function DashboardView({ assets, activeSO, onNavigateToTab, isAdminLoggedIn, onOpenLoginModal }) {
       const stats = useMemo(() => {
