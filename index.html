@@ -87,23 +87,6 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
   <script type="text/babel">
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbzDETBAs3X_tR-U2MYd6IowQ6Q9AS9_4CGstcnLqidIFzTWIkmx3-_SMcPe1c7Jye0P/exec";
-  async function sendToGAS(action, payload = {}) {
-  try {
-    const response = await fetch(GAS_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8", // Sangat penting agar tidak terkena CORS
-      },
-      body: JSON.stringify({ action: action, ...payload }),
-    });
-    
-    const result = await response.json();
-    return result;
-  } catch (error) {
-    console.error("Error connecting to GAS:", error);
-    throw error;
-  }
 }
    const { useState, useEffect, useRef, useMemo } = React;
 
