@@ -202,26 +202,6 @@
         </div>
       );
     }
-    function ConfirmDialog({ isOpen, title, message, onConfirm, onCancel }) {
-      if (!isOpen) return null;
-      return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="bg-[#12324b] border border-[#1e5574] w-full max-w-sm rounded-2xl p-6 space-y-6">
-            <div className="text-center space-y-2">
-              <div className="h-12 w-12 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto">
-                <Icon name="help-circle" className="h-6 w-6" />
-              </div>
-              <h4 className="font-extrabold text-sm text-white">{title}</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed">{message}</p>
-            </div>
-            <div className="flex gap-2 text-xs">
-              <button onClick={onCancel} className="flex-1 py-2.5 border border-slate-700 text-slate-300 rounded-xl font-bold hover:bg-slate-950/40">Batal</button>
-              <button onClick={onConfirm} className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow">Ya, Lanjutkan</button>
-            </div>
-          </div>
-        </div>
-      );
-    }
 
     function CameraScanner({ onScanSuccess, scannerId = "reader", isActive, triggerToast }) {
       // permState: 'unknown' | 'checking' | 'prompt' | 'granted' | 'denied' | 'unavailable'
