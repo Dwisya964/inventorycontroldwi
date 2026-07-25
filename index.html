@@ -87,7 +87,6 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
   <script type="text/babel">
-}
    const { useState, useEffect, useRef, useMemo } = React;
 
     // =========================================================
@@ -96,27 +95,54 @@
     // Ganti URL di bawah dengan Web App URL dari Deployment GAS Anda
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzDETBAs3X_tR-U2MYd6IowQ6Q9AS9_4CGstcnLqidIFzTWIkmx3-_SMcPe1c7Jye0P/exec";
 
-    // Helper fungsi universal untuk komunikasi Fetch API ke GAS (Aman dari CORS)
-   async function sendToGAS(action, payload = {}) {
-      if (!isGasActive) {
-        console.warn("GAS_URL belum dikonfigurasi.");
-        return { error: "GAS_URL belum dikonfigurasi" };
+    // Jika file dibuka dari Google Apps Script, bridge ini tersedia dan tidak
+    // membutuhkan CORS. Jika dibuka dari GitHub Pages, gunakan fetch ke Web App.
+    const HAS_GAS_BRIDGE =
+      typeof google !== "undefined" &&
+      google.script &&
+      google.script.run;
+
+    function callGasBridge(action, payload) {
+      const bridgeMethod = {
+        getAssets: ["getSpreadsheetData", []],
+        addOrUpdateAsset: ["addOrUpdateAssetGas", [payload.assetData || payload.data]],
+        deleteAsset: ["deleteAssetGas", [payload.id]],
+        addSOItem: ["saveStockOpnameDraftGas", [payload.data || []]],
+        saveStockOpnameDraft: ["saveStockOpnameDraftGas", [payload.data || []]],
+        releaseSOReport: ["releaseSOReport", [payload.data]],
+        updateCompletedSO: ["updateCompletedSOGas", [payload.id, payload.periode, payload.lokasi]],
+        deleteCompletedSO: ["deleteCompletedSOGas", [payload.id]],
+        savePergerakanSO: ["savePergerakanSO", [payload.data]],
+      }[action];
+
+      if (!bridgeMethod) {
+        return Promise.resolve({ success: false, error: `Aksi tidak dikenal: ${action}` });
       }
 
+      return new Promise((resolve) => {
+        const runner = google.script.run
+          .withSuccessHandler((result) => resolve(result || { success: true }))
+          .withFailureHandler((error) =>
+            resolve({ success: false, error: error?.message || String(error) })
+          );
+        runner[bridgeMethod[0]](...bridgeMethod[1]);
+      });
+    }
+
+    async function sendToGAS(action, payload = {}) {
+      if (HAS_GAS_BRIDGE) {
+        return callGasBridge(action, payload);
+      }
+      if (!GAS_URL || !GAS_URL.startsWith("https://script.google.com/")) {
+        return { success: false, error: "GAS_URL belum dikonfigurasi." };
+      }
       try {
         const response = await fetch(GAS_URL, {
           method: "POST",
-          headers: {
-            "Content-Type": "text/plain;charset=utf-8",
-          },
-          // Menggabungkan action dan payload menjadi satu objek JSON
-          body: JSON.stringify({ action: action, ...payload }),
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action, ...payload }),
         });
-
-        if (!response.ok) {
-          throw new Error(`HTTP Status Error: ${response.status}`);
-        }
-
+        if (!response.ok) throw new Error(`HTTP Status Error: ${response.status}`);
         return await response.json();
       } catch (error) {
         console.error("Gagal terhubung ke Google Apps Script:", error);
@@ -185,7 +211,6 @@
         </div>
       );
     }
-
     function CameraScanner({ onScanSuccess, scannerId = "reader", isActive, triggerToast }) {
       // permState: 'unknown' | 'checking' | 'prompt' | 'granted' | 'denied' | 'unavailable'
       const [permState, setPermState] = useState('unknown');
@@ -2069,7 +2094,9 @@
       const [importedFileName, setImportedFileName] = useState("");
       const [finalSORecords, setFinalSORecords] = useState([]);
       const [sheetUrl, setSheetUrl] = useState("");
-      const [isGasActive, setIsGasActive] = useState(false);
+      const [isGasActive, setIsGasActive] = useState(
+        () => typeof GAS_URL !== "undefined" && GAS_URL.startsWith("https://script.google.com/")
+      );
 
       const [toast, setToast] = useState(null);
       const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -2079,12 +2106,6 @@
         setToast(message);
         setTimeout(() => setToast(null), 3000);
       };
-
-      // Cek apakah GAS_URL telah diisi dengan URL Web App Google Apps Script yang valid
-      const isGasActive = 
-        typeof GAS_URL !== "undefined" && 
-        GAS_URL !== "" && 
-        GAS_URL.startsWith("https://script.google.com/");
 
       // Memuat data dari Google Sheets saat aplikasi pertama kali dibuka
       useEffect(() => {
@@ -2098,11 +2119,16 @@
               // Panggil fungsi mengambil data aset dari GAS
               const res = await sendToGAS("getAssets");
               
-              if (res && res.status === "success" && Array.isArray(res.data)) {
-                setAssets(res.data);
+              if (res && (res.status === "success" || res.success) && !res.error) {
+                const snapshot = res.data || res;
+                setAssets(Array.isArray(snapshot.assets) ? snapshot.assets : []);
+                setActiveSO(Array.isArray(snapshot.activeSO) ? snapshot.activeSO : []);
+                setCompletedSO(Array.isArray(snapshot.completedSO) ? snapshot.completedSO : []);
+                setSheetUrl(snapshot.sheetUrl || "");
                 triggerToast("✓ Data aset berhasil dimuat dari Spreadsheet!");
               } else {
-                triggerToast("⚠️ Format data dari Spreadsheet tidak sesuai.");
+                setIsGasActive(false);
+                triggerToast(`⚠️ ${res?.error || "Format data dari Spreadsheet tidak sesuai."}`);
               }
             } catch (error) {
               console.error("Gagal memuat data dari GAS:", error);
@@ -2230,7 +2256,7 @@
         });
       };
 
-      const handleAddSOItem = (itemPayload) => {
+      const handleAddSOItem = async (itemPayload) => {
         const existingIdx = activeSO.findIndex(x => x.kodeBarang === itemPayload.barcode && x.lokasi === itemPayload.lokasi);
         let updatedSO = [...activeSO];
         const timestamp = new Date().toLocaleString("id-ID");
@@ -2272,7 +2298,7 @@
         }
       };
 
-      const handleUpdateSOItem = (id, newQty, newLokasi) => {
+      const handleUpdateSOItem = async (id, newQty, newLokasi) => {
         const updated = activeSO.map(item => item.id === id ? { ...item, qty: newQty, lokasi: newLokasi, waktuInput: new Date().toLocaleString("id-ID") } : item);
         setActiveSO(updated);
         if (isGasActive) {
@@ -2313,7 +2339,7 @@
         }
       };
 
-      const handleSaveSODraft = () => {
+      const handleSaveSODraft = async () => {
         if (isGasActive) {
           triggerToast("Mencadangkan draf ke Spreadsheet...");
           try {
@@ -2337,7 +2363,7 @@
           isOpen: true,
           title: "Selesaikan Stock Opname?",
           message: `Arsipkan ${activeSO.length} item untuk periode ${periode} di ${lokasi}? Sesi draf aktif akan dibersihkan.`,
-          onConfirm: () => {
+          onConfirm: async () => {
             const finishedDate = new Date().toLocaleString("id-ID");
             const fileDate = finishedDate.replace(/[\/\s:]/g, "");
             const totalQty = activeSO.reduce((s, x) => s + x.qty, 0);
@@ -2425,15 +2451,17 @@
         });
       };
 
-      const handleUpdateCompletedSO = (id, newPeriode, newLokasi) => {
+      const handleUpdateCompletedSO = async (id, newPeriode, newLokasi) => {
         const updated = completedSO.map(so => so.id === id ? { ...so, periode: newPeriode, lokasi: newLokasi } : so);
         setCompletedSO(updated);
         triggerToast("Arsip diperbarui.");
        if (isGasActive) {
           try {
             // Sesuai switch-case di code.gs Anda: action 'updateSOItem'
-            const res = await sendToGAS("updateSOItem", { 
-              data: { id, newPeriode, newLokasi } 
+            const res = await sendToGAS("updateCompletedSO", {
+              id,
+              periode: newPeriode,
+              lokasi: newLokasi
             });
 
             if (res && (res.status === "success" || res.success || !res.error)) {
@@ -2452,7 +2480,7 @@
           isOpen: true,
           title: "Hapus Arsip Laporan",
           message: "Apakah Anda yakin ingin menghapus laporan ini? Seluruh data riwayat detail laporan ini akan ikut terhapus.",
-          onConfirm: () => {
+          onConfirm: async () => {
             setCompletedSO(completedSO.filter(so => so.id !== id));
             setConfirmDialog(p => ({ ...p, isOpen: false }));
             triggerToast("Arsip laporan dihapus.");
@@ -2460,7 +2488,7 @@
               triggerToast("Menghapus arsip dari Spreadsheet...");
               try {
                 // Sesuai dengan switch-case di code.gs Anda: action 'deleteSOItem'
-                const res = await sendToGAS("deleteSOItem", { id: id });
+                const res = await sendToGAS("deleteCompletedSO", { id: id });
 
                 if (res && (res.status === "success" || res.success || !res.error)) {
                   triggerToast("✓ Arsip berhasil dihapus permanen.");
