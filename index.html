@@ -1,12 +1,54 @@
 <!DOCTYPE html>
 <html lang="id" class="h-full">
 <head>
-  <meta charset="UTF-8">
+  
+ <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Asset Pro · Ocean Command</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- 1. Tag Nama Aplikasi & Warna Theme HP -->
+  <meta name="application-name" content="Asset Pro" />
+  <meta name="apple-mobile-web-app-title" content="Asset Pro" />
+  <meta name="theme-color" content="#040814" />
+
+  <!-- 2. Favicon (Logo Tab Browser Laptop & HP) -->
+  <link rel="icon" type="image/png" sizes="32x32" href="https://img.icons8.com/fluency/96/qr-code.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="https://img.icons8.com/fluency/96/qr-code.png" />
+
+  <!-- 3. Logo Pintasan Layar Utama HP (Android & iPhone) -->
+  <link rel="apple-touch-icon" sizes="180x180" href="https://img.icons8.com/fluency/192/qr-code.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <!-- 4. Config Manifest Pintasan HP -->
+  <link rel="manifest" href="data:application/manifest+json,{
+    %22name%22:%22Asset%20Pro%20Platform%22,
+    %22short_name%22:%22Asset%20Pro%22,
+    %22start_url%22:%22./%22,
+    %22display%22:%22standalone%22,
+    %22background_color%22:%22%23040814%22,
+    %22theme_color%22:%22%23040814%22,
+    %22icons%22:[
+      {
+        %22src%22:%22https://img.icons8.com/fluency/192/qr-code.png%22,
+        %22sizes%22:%22192x192%22,
+        %22type%22:%22image/png%22
+      },
+      {
+        %22src%22:%22https://img.icons8.com/fluency/512/qr-code.png%22,
+        %22sizes%22:%22512x512%22,
+        %22type%22:%22image/png%22
+      }
+    ]
+  }" />
+
+  <!-- 5. Font Manrope (Bawaan Kode Kamu) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- 6. Tailwind CSS & Custom Config (Bawaan Kode Kamu) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
