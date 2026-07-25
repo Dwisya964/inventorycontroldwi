@@ -11,9 +11,9 @@
 const SPREADSHEET_ID = '1jAaI1W1sK4aUHBzNdO4deTEP5DSexHGDd1JQpZJ-_No';
 
 // Nama file HTML di project Google Apps Script (tanpa ekstensi .html).
-// Umumnya file yang dibuat dari template ini bernama "Index".
-const HTML_FILE_NAME = 'Index';
-const HTML_FILE_FALLBACK_NAME = 'Index_1784811138558';
+// Umumnya file yang dibuat dari template ini bernama "index".
+const HTML_FILE_NAME = 'index';
+const HTML_FILE_FALLBACK_NAME = 'index_1784811138558';
 
 // Nama sheet (tab) di Spreadsheet
 const SHEET_ASSETS     = 'Daftar Aset';
@@ -25,13 +25,8 @@ const SHEET_PERGERAKAN = 'Pergerakan SO';
 // ENTRY POINT — Web App
 // ──────────────────────────────────────────────
 function doGet(e) {
-  // Tanpa parameter action, Google Apps Script harus mengembalikan halaman UI,
-  // bukan JSON. Mengembalikan JSON di sini membuat Web App terlihat blank /
-  // hanya menampilkan respons API.
+  // Ambil parameter 'action' dari URL
   const action = e && e.parameter ? (e.parameter.action || '') : '';
-  if (!action) {
-    return createAppHtml();
-  }
 
   try {
     switch (action) {
@@ -39,8 +34,13 @@ function doGet(e) {
       case 'getActiveSO':         return jsonResponse(getActiveSO());
       case 'getFinalSO':          return jsonResponse(getFinalSO());
       case 'getPergerakanSO':     return jsonResponse(getPergerakanSO());
+      
+      // Jika dipanggil dari browser langsung tanpa action, atau action tidak dikenal
       default:
-        return jsonResponse({ status: 'ok', message: 'ASSET PRO v2 API running.' });
+        return jsonResponse({ 
+          status: 'ok', 
+          message: 'ASSET PRO v2 API Running. Backend connected successfully!' 
+        });
     }
   } catch (err) {
     return jsonResponse({ error: err.message });
@@ -56,7 +56,7 @@ function createAppHtml() {
       html = HtmlService.createHtmlOutputFromFile(HTML_FILE_FALLBACK_NAME);
     } catch (secondError) {
       throw new Error(
-        'File HTML tidak ditemukan. Buat file Index.html di project Apps Script, ' +
+        'File HTML tidak ditemukan. Buat file index.html di project Apps Script, ' +
         'lalu tempel isi file HTML yang disediakan.'
       );
     }
@@ -69,16 +69,41 @@ function createAppHtml() {
 function doPost(e) {
   const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
   const action  = payload.action || '';
+  
   try {
     switch (action) {
-      case 'saveAsset':           return jsonResponse(saveAsset(payload.data));
-      case 'updateAsset':         return jsonResponse(updateAsset(payload.data));
-      case 'deleteAsset':         return jsonResponse(deleteAsset(payload.id));
-      case 'addSOItem':           return jsonResponse(addSOItem(payload.data));
-      case 'updateSOItem':        return jsonResponse(updateSOItem(payload.data));
-      case 'deleteSOItem':        return jsonResponse(deleteSOItem(payload.id));
-      case 'releaseSOReport':     return jsonResponse(releaseSOReport(payload.data));
-      case 'savePergerakanSO':    return jsonResponse(savePergerakanSO(payload.data));
+      // 1. TAMBAHAN: Untuk mengambil seluruh data aset saat aplikasi dibuka
+      case 'getAssets':
+      case 'getAllAssets':
+        return jsonResponse({ status: "success", data: getAssetsFromSheet() });
+
+      // 2. Aset Master
+      case 'saveAsset':
+      case 'addAsset':
+        return jsonResponse(saveAsset(payload.data || payload.assetData));
+
+      case 'updateAsset':
+        return jsonResponse(updateAsset(payload.data || payload.assetData));
+
+      case 'deleteAsset':
+        return jsonResponse(deleteAsset(payload.id));
+
+      // 3. Stock Opname (SO)
+      case 'addSOItem':
+        return jsonResponse(addSOItem(payload.data));
+
+      case 'updateSOItem':
+        return jsonResponse(updateSOItem(payload.data));
+
+      case 'deleteSOItem':
+        return jsonResponse(deleteSOItem(payload.id));
+
+      case 'releaseSOReport':
+        return jsonResponse(releaseSOReport(payload.data));
+
+      case 'savePergerakanSO':
+        return jsonResponse(savePergerakanSO(payload.data));
+
       default:
         return jsonResponse({ error: 'Unknown action: ' + action });
     }
@@ -133,7 +158,7 @@ function getAssets() {
 }
 
 // ============================================================
-// FUNGSI BRIDGE UNTUK INDEX.HTML
+// FUNGSI BRIDGE UNTUK iNDEX.HTML
 // ============================================================
 // Halaman menggunakan google.script.run secara langsung. Nama fungsi bridge
 // berikut sengaja disamakan dengan yang dipanggil oleh frontend.
