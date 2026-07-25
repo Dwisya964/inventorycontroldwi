@@ -35,15 +35,15 @@ function doGet(e) {
       case 'getFinalSO':          return jsonResponse(getFinalSO());
       case 'getPergerakanSO':     return jsonResponse(getPergerakanSO());
       
-      // Jika dipanggil dari browser langsung tanpa action, atau action tidak dikenal
+      // Tanpa action, tampilkan aplikasi HTML. Endpoint API tetap memakai
+      // parameter ?action=... atau method POST.
       default:
-        return jsonResponse({ 
-          status: 'ok', 
-          message: 'ASSET PRO v2 API Running. Backend connected successfully!' 
-        });
+        return createAppHtml();
     }
   } catch (err) {
-    return jsonResponse({ error: err.message });
+    // Jika HTML gagal dibuka, tetap kembalikan informasi error yang mudah
+    // dibaca saat URL Web App dibuka langsung.
+    return jsonResponse({ status: 'error', error: err.message });
   }
 }
 
@@ -67,20 +67,27 @@ function createAppHtml() {
 }
 
 function doPost(e) {
-  const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-  const action  = payload.action || '';
+  let payload = {};
+  try {
+    payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+  } catch (parseError) {
+    return jsonResponse({ success: false, error: 'Body request bukan JSON yang valid.' });
+  }
+  const action = payload.action || '';
   
   try {
     switch (action) {
-      // 1. TAMBAHAN: Untuk mengambil seluruh data aset saat aplikasi dibuka
+      // Snapshot dipakai oleh frontend agar aset, draft SO, arsip SO, dan
+      // URL spreadsheet selalu dimuat dalam satu request.
       case 'getAssets':
       case 'getAllAssets':
-        return jsonResponse({ status: "success", data: getAssetsFromSheet() });
+        return jsonResponse({ status: 'success', data: getSpreadsheetData() });
 
       // 2. Aset Master
+      case 'addOrUpdateAsset':
       case 'saveAsset':
       case 'addAsset':
-        return jsonResponse(saveAsset(payload.data || payload.assetData));
+        return jsonResponse(addOrUpdateAssetGas(payload.data || payload.assetData));
 
       case 'updateAsset':
         return jsonResponse(updateAsset(payload.data || payload.assetData));
@@ -90,7 +97,15 @@ function doPost(e) {
 
       // 3. Stock Opname (SO)
       case 'addSOItem':
+        // Kompatibilitas dengan versi frontend lama yang mengirim seluruh
+        // draft sebagai array.
+        if (Array.isArray(payload.data)) {
+          return jsonResponse(saveStockOpnameDraftGas(payload.data));
+        }
         return jsonResponse(addSOItem(payload.data));
+
+      case 'saveStockOpnameDraft':
+        return jsonResponse(saveStockOpnameDraftGas(payload.data || []));
 
       case 'updateSOItem':
         return jsonResponse(updateSOItem(payload.data));
@@ -101,14 +116,26 @@ function doPost(e) {
       case 'releaseSOReport':
         return jsonResponse(releaseSOReport(payload.data));
 
+      case 'updateCompletedSO':
+        return jsonResponse(updateCompletedSOGas(
+          payload.id || (payload.data && payload.data.id),
+          payload.periode || (payload.data && payload.data.periode),
+          payload.lokasi || (payload.data && payload.data.lokasi)
+        ));
+
+      case 'deleteCompletedSO':
+        return jsonResponse(deleteCompletedSOGas(
+          payload.id || (payload.data && payload.data.id)
+        ));
+
       case 'savePergerakanSO':
         return jsonResponse(savePergerakanSO(payload.data));
 
       default:
-        return jsonResponse({ error: 'Unknown action: ' + action });
+        return jsonResponse({ success: false, error: 'Unknown action: ' + action });
     }
   } catch (err) {
-    return jsonResponse({ error: err.message });
+    return jsonResponse({ success: false, error: err.message });
   }
 }
 
@@ -155,6 +182,11 @@ function getAssets() {
     keterangan:  String(r[9]),
     fotoUrl:     convertDriveUrl(String(r[10] || '')),
   }));
+}
+
+// Nama lama ini dipertahankan agar deployment sebelumnya tetap kompatibel.
+function getAssetsFromSheet() {
+  return getAssets();
 }
 
 // ============================================================
