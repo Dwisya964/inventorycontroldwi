@@ -1,20 +1,25 @@
 {
-  "name": "Dwisyafitriproject",
-  "short_name": "asetpro",
+  "name": "Asset Pro",
+  "short_name": "Asset Pro",
+  "description": "Asset Pro - Inventory & Stock Opname",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "orientation": "portrait",
+  "background_color": "#040814",
+  "theme_color": "#040814",
   "icons": [
     {
-      "src": "barcodee.png",
+      "src": "barcode.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "barcodee.png",
+      "src": "barcode.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
